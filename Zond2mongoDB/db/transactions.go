@@ -247,17 +247,12 @@ func processTokenContract(targetAddress string, txHash string, blockNumber strin
 				zap.Error(err))
 		}
 
-		// Update token balances
-		if err := StoreTokenBalance(targetAddress, from, "-"+amount, blockNumber); err != nil {
-			configs.Logger.Error("Failed to store token balance for sender",
+		// Update token balances using the new dedicated function
+		if err := UpdateTokenBalancesForTransfer(targetAddress, from, recipient, amount, blockNumber); err != nil {
+			configs.Logger.Error("Failed to update token balances for transfer",
 				zap.String("contract", targetAddress),
-				zap.String("holder", from),
-				zap.Error(err))
-		}
-		if err := StoreTokenBalance(targetAddress, recipient, amount, blockNumber); err != nil {
-			configs.Logger.Error("Failed to store token balance for recipient",
-				zap.String("contract", targetAddress),
-				zap.String("holder", recipient),
+				zap.String("from", from),
+				zap.String("to", recipient),
 				zap.Error(err))
 		}
 	}
@@ -299,17 +294,12 @@ func processTokenContract(targetAddress string, txHash string, blockNumber strin
 				zap.Error(err))
 		}
 
-		// Update token balances
-		if err := StoreTokenBalance(targetAddress, transferEvent.From, "-"+transferEvent.Amount, blockNumber); err != nil {
-			configs.Logger.Error("Failed to store token balance for sender",
+		// Update token balances using the new dedicated function
+		if err := UpdateTokenBalancesForTransfer(targetAddress, transferEvent.From, transferEvent.To, transferEvent.Amount, blockNumber); err != nil {
+			configs.Logger.Error("Failed to update token balances for transfer",
 				zap.String("contract", targetAddress),
-				zap.String("holder", transferEvent.From),
-				zap.Error(err))
-		}
-		if err := StoreTokenBalance(targetAddress, transferEvent.To, transferEvent.Amount, blockNumber); err != nil {
-			configs.Logger.Error("Failed to store token balance for recipient",
-				zap.String("contract", targetAddress),
-				zap.String("holder", transferEvent.To),
+				zap.String("from", transferEvent.From),
+				zap.String("to", transferEvent.To),
 				zap.Error(err))
 		}
 	}

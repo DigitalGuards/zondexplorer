@@ -368,28 +368,20 @@ func ProcessBlockTokenTransfers(blockNumber string, blockTimestamp string) error
 			zap.String("to", to),
 			zap.String("amount", amount))
 
-		err = StoreTokenBalance(contractAddress, from, "-"+amount, blockNumber)
+		err = UpdateTokenBalancesForTransfer(contractAddress, from, to, amount, blockNumber)
 		if err != nil {
-			configs.Logger.Error("Failed to update sender token balance",
-				zap.String("address", from),
+			configs.Logger.Error("Failed to update token balances for transfer",
+				zap.String("txHash", log.TransactionHash),
 				zap.String("contractAddress", contractAddress),
+				zap.String("from", from),
+				zap.String("to", to),
 				zap.Error(err))
 		} else {
-			configs.Logger.Info("Successfully updated sender token balance",
-				zap.String("address", from),
-				zap.String("contractAddress", contractAddress))
-		}
-
-		err = StoreTokenBalance(contractAddress, to, amount, blockNumber)
-		if err != nil {
-			configs.Logger.Error("Failed to update recipient token balance",
-				zap.String("address", to),
+			configs.Logger.Info("Successfully updated token balances for transfer",
+				zap.String("txHash", log.TransactionHash),
 				zap.String("contractAddress", contractAddress),
-				zap.Error(err))
-		} else {
-			configs.Logger.Info("Successfully updated recipient token balance",
-				zap.String("address", to),
-				zap.String("contractAddress", contractAddress))
+				zap.String("from", from),
+				zap.String("to", to))
 		}
 	}
 
