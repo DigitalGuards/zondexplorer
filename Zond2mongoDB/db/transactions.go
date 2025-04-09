@@ -248,7 +248,7 @@ func processTokenContract(targetAddress string, txHash string, blockNumber strin
 		}
 
 		// Update token balances
-		if err := StoreTokenBalance(targetAddress, from, amount, blockNumber); err != nil {
+		if err := StoreTokenBalance(targetAddress, from, "-"+amount, blockNumber); err != nil {
 			configs.Logger.Error("Failed to store token balance for sender",
 				zap.String("contract", targetAddress),
 				zap.String("holder", from),
@@ -300,7 +300,7 @@ func processTokenContract(targetAddress string, txHash string, blockNumber strin
 		}
 
 		// Update token balances
-		if err := StoreTokenBalance(targetAddress, transferEvent.From, transferEvent.Amount, blockNumber); err != nil {
+		if err := StoreTokenBalance(targetAddress, transferEvent.From, "-"+transferEvent.Amount, blockNumber); err != nil {
 			configs.Logger.Error("Failed to store token balance for sender",
 				zap.String("contract", targetAddress),
 				zap.String("holder", transferEvent.From),

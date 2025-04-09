@@ -6,6 +6,7 @@ import (
 	"Zond2mongoDB/rpc"
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -43,16 +44,91 @@ func StoreTokenBalance(contractAddress string, holderAddress string, amount stri
 	configs.Logger.Debug("Calling RPC to get current token balance")
 	balance, err := rpc.GetTokenBalance(contractAddress, holderAddress)
 	if err != nil {
-		configs.Logger.Error("Failed to get token balance from RPC",
+		// If RPC fails, try to get the existing balance from database and calculate new balance
+		configs.Logger.Warn("Failed to get token balance from RPC, attempting to calculate from existing record",
 			zap.String("contractAddress", contractAddress),
 			zap.String("holderAddress", holderAddress),
 			zap.Error(err))
-		// Continue with a zero balance if we can't get the actual balance
-		// This allows us to at least record that we tried to update this token balance
-		configs.Logger.Info("Using default zero balance after RPC failure")
-		balance = "0"
+
+		// Get existing balance from DB
+		var existingBalance models.TokenBalance
+		filter := bson.M{
+			"contractAddress": contractAddress,
+			"holderAddress":   holderAddress,
+		}
+		
+		err = collection.FindOne(context.Background(), filter).Decode(&existingBalance)
+		if err == nil && existingBalance.Balance != "" {
+			// Convert existing balance and amount to big.Int
+			existingBig := new(big.Int)
+			amountBig := new(big.Int)
+			
+			// Try to parse existing balance
+			_, success1 := existingBig.SetString(existingBalance.Balance, 10)
+			
+			// Try to parse amount (strip 0x prefix if present)
+			amountStr := amount
+			isNegative := false
+			if strings.HasPrefix(amountStr, "-") {
+				isNegative = true
+				amountStr = strings.TrimPrefix(amountStr, "-")
+			}
+			
+			if strings.HasPrefix(amountStr, "0x") {
+				amountStr = amountStr[2:]
+				_, success2 := amountBig.SetString(amountStr, 16)
+				if !success2 {
+					configs.Logger.Error("Failed to parse transfer amount as hex",
+						zap.String("amount", amount))
+					amountBig.SetInt64(0)
+				}
+			} else {
+				_, success2 := amountBig.SetString(amountStr, 10)
+				if !success2 {
+					configs.Logger.Error("Failed to parse transfer amount as decimal",
+						zap.String("amount", amount))
+					amountBig.SetInt64(0)
+				}
+			}
+			
+			// If negative (sender of a transfer), subtract amount
+			if isNegative {
+				amountBig = amountBig.Neg(amountBig)
+			}
+			
+			if success1 {
+				// Calculate new balance based on whether this is a send or receive
+				newBalance := new(big.Int).Add(existingBig, amountBig)
+				// Ensure balance doesn't go negative
+				if newBalance.Sign() < 0 {
+					configs.Logger.Warn("Calculated negative balance, setting to zero",
+						zap.String("contractAddress", contractAddress),
+						zap.String("holderAddress", holderAddress),
+						zap.String("existingBalance", existingBalance.Balance),
+						zap.String("amount", amount))
+					newBalance.SetInt64(0)
+				}
+				balance = newBalance.String()
+				
+				configs.Logger.Info("Calculated balance from existing record",
+					zap.String("contractAddress", contractAddress),
+					zap.String("holderAddress", holderAddress),
+					zap.String("existingBalance", existingBalance.Balance),
+					zap.String("amount", amount),
+					zap.String("calculatedBalance", balance))
+			} else {
+				configs.Logger.Error("Failed to parse existing balance",
+					zap.String("balance", existingBalance.Balance))
+				balance = "0"
+			}
+		} else {
+			configs.Logger.Info("No existing balance found, using default zero balance",
+				zap.String("contractAddress", contractAddress),
+				zap.String("holderAddress", holderAddress))
+			balance = "0"
+		}
 	} else {
-		configs.Logger.Info("Retrieved current token balance",
+		configs.Logger.Info("Retrieved current token balance from RPC",
 			zap.String("contractAddress", contractAddress),
 			zap.String("holderAddress", holderAddress),
 			zap.String("balance", balance))

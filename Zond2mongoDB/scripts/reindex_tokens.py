@@ -129,56 +129,81 @@ def process_transfer_logs(logs, contract_address, token_balances_collection, tok
                 if 'duplicate key error' not in str(e):  # Ignore duplicates
                     logger.error(f"Failed to store transfer {tx_hash}: {e}")
             
-            # Update balances as strings to avoid integer overflow
+            # Update FROM address (sender) - subtract amount
             if from_addr != '0x0000000000000000000000000000000000000000' and from_addr != 'Z0000000000000000000000000000000000000000':
-                # Get current balance
-                current_from_balance_doc = token_balances_collection.find_one(
-                    {'contractAddress': contract_address, 'holderAddress': from_addr}
-                )
-                
-                current_from_balance = 0
-                if current_from_balance_doc and 'balance' in current_from_balance_doc:
-                    # Convert existing balance to integer if it's a string
-                    if isinstance(current_from_balance_doc['balance'], str):
-                        try:
-                            current_from_balance = int(current_from_balance_doc['balance'])
-                        except ValueError:
-                            current_from_balance = 0
-                    else:
-                        current_from_balance = current_from_balance_doc['balance']
-                        
-                # Calculate new balance and store as string
-                new_from_balance = max(0, current_from_balance - amount)
-                token_balances_collection.update_one(
-                    {'contractAddress': contract_address, 'holderAddress': from_addr},
-                    {'$set': {'balance': str(new_from_balance)}},
-                    upsert=True
-                )
+                # Update using direct RPC call to get accurate balance
+                try:
+                    actual_balance = get_token_balance(contract_address, from_addr)
+                    token_balances_collection.update_one(
+                        {'contractAddress': contract_address, 'holderAddress': from_addr},
+                        {'$set': {'balance': str(actual_balance)}},
+                        upsert=True
+                    )
+                    logger.info(f"Updated sender balance for {from_addr}: {actual_balance}")
+                except Exception as e:
+                    logger.error(f"Failed to get direct balance for {from_addr}: {e}")
+                    
+                    # Fallback to calculated balance if RPC fails
+                    current_from_balance_doc = token_balances_collection.find_one(
+                        {'contractAddress': contract_address, 'holderAddress': from_addr}
+                    )
+                    
+                    current_from_balance = 0
+                    if current_from_balance_doc and 'balance' in current_from_balance_doc:
+                        # Convert existing balance to integer if it's a string
+                        if isinstance(current_from_balance_doc['balance'], str):
+                            try:
+                                current_from_balance = int(current_from_balance_doc['balance'])
+                            except ValueError:
+                                current_from_balance = 0
+                        else:
+                            current_from_balance = current_from_balance_doc['balance']
+                            
+                    # Calculate new balance and ensure it doesn't go negative
+                    new_from_balance = max(0, current_from_balance - amount)
+                    token_balances_collection.update_one(
+                        {'contractAddress': contract_address, 'holderAddress': from_addr},
+                        {'$set': {'balance': str(new_from_balance)}},
+                        upsert=True
+                    )
             
+            # Update TO address (recipient) - add amount
             if to_addr != '0x0000000000000000000000000000000000000000' and to_addr != 'Z0000000000000000000000000000000000000000':
-                # Get current balance
-                current_to_balance_doc = token_balances_collection.find_one(
-                    {'contractAddress': contract_address, 'holderAddress': to_addr}
-                )
-                
-                current_to_balance = 0
-                if current_to_balance_doc and 'balance' in current_to_balance_doc:
-                    # Convert existing balance to integer if it's a string
-                    if isinstance(current_to_balance_doc['balance'], str):
-                        try:
-                            current_to_balance = int(current_to_balance_doc['balance'])
-                        except ValueError:
-                            current_to_balance = 0
-                    else:
-                        current_to_balance = current_to_balance_doc['balance']
-                        
-                # Calculate new balance and store as string
-                new_to_balance = current_to_balance + amount
-                token_balances_collection.update_one(
-                    {'contractAddress': contract_address, 'holderAddress': to_addr},
-                    {'$set': {'balance': str(new_to_balance)}},
-                    upsert=True
-                )
+                # Update using direct RPC call to get accurate balance
+                try:
+                    actual_balance = get_token_balance(contract_address, to_addr)
+                    token_balances_collection.update_one(
+                        {'contractAddress': contract_address, 'holderAddress': to_addr},
+                        {'$set': {'balance': str(actual_balance)}},
+                        upsert=True
+                    )
+                    logger.info(f"Updated recipient balance for {to_addr}: {actual_balance}")
+                except Exception as e:
+                    logger.error(f"Failed to get direct balance for {to_addr}: {e}")
+                    
+                    # Fallback to calculated balance if RPC fails
+                    current_to_balance_doc = token_balances_collection.find_one(
+                        {'contractAddress': contract_address, 'holderAddress': to_addr}
+                    )
+                    
+                    current_to_balance = 0
+                    if current_to_balance_doc and 'balance' in current_to_balance_doc:
+                        # Convert existing balance to integer if it's a string
+                        if isinstance(current_to_balance_doc['balance'], str):
+                            try:
+                                current_to_balance = int(current_to_balance_doc['balance'])
+                            except ValueError:
+                                current_to_balance = 0
+                        else:
+                            current_to_balance = current_to_balance_doc['balance']
+                            
+                    # Calculate new balance and store as string
+                    new_to_balance = current_to_balance + amount
+                    token_balances_collection.update_one(
+                        {'contractAddress': contract_address, 'holderAddress': to_addr},
+                        {'$set': {'balance': str(new_to_balance)}},
+                        upsert=True
+                    )
             
             # Update last processed block
             token_balances_collection.update_one(
