@@ -348,3 +348,8 @@ func GetListCollectionNames(client *mongo.Client) []string {
 
 	return result
 }
+
+// Getter for addresses collection
+func GetAddressesCollection() *mongo.Collection {
+	return GetCollection(DB, "tokenBalances")
+}

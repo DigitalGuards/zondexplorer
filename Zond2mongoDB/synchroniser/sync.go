@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 )
@@ -342,6 +343,10 @@ func Sync() {
 
 	configs.Logger.Info("Calculating daily transaction volume...")
 	db.GetDailyTransactionVolume()
+
+	go func() {
+		updateTokenBalances()
+	}()
 
 	// Check the actual last known block after sync to ensure we have the right value
 	lastSyncedBlock := db.GetLastKnownBlockNumber()
@@ -1097,3 +1102,137 @@ func storeInitialSyncStartBlock(blockNumber string) {
 			zap.Error(err))
 	}
 }
+
+// Begin Kay
+// func updateTokenBalances() error {
+func updateTokenBalances() {
+	var blockNumber = "00"
+
+	collection := configs.GetTokenBalancesCollection()
+	if collection == nil {
+		configs.Logger.Error("Failed to get token balances collection")
+		// return fmt.Errorf("token balances collection is nil")
+		return
+	}
+
+	addressCollection := configs.GetAddressesCollection()
+	if addressCollection == nil {
+		configs.Logger.Error("Failed to get addresses collection")
+		// return fmt.Errorf("addresses collection is nil")
+		return
+	}
+
+	// var contractAddresses []models.Address
+	// var holderAddresses []models.Address
+	contractAddresses, err := GetTokenContracts(addressCollection)
+	if err != nil {
+		configs.Logger.Error("Failed to get contract addresses", zap.Error(err))
+		// return fmt.Errorf("failed to get contract addresses: %v", err)
+	}
+
+	holderAddresses, err := GetTokenHolders(addressCollection)
+	if err != nil {
+		configs.Logger.Error("Failed to get holders addresses", zap.Error(err))
+		// return fmt.Errorf("failed to get holder addresses: %v", err)
+	}
+
+	for _, contractAddress := range contractAddresses {
+		for _, holderAddress := range holderAddresses {
+			configs.Logger.Debug("Kay Calling RPC to get current token balance")
+			balance, err := rpc.GetTokenBalance(contractAddress.ID, holderAddress.ID)
+			if err != nil {
+				configs.Logger.Error("Kay Failed to get token balance from RPC",
+					zap.String("contractAddress", contractAddress.ID),
+					zap.String("holderAddress", holderAddress.ID),
+					zap.Error(err))
+				// Continue with a zero balance if we can't get the actual balance
+				// This allows us to at least record that we tried to update this token balance
+				configs.Logger.Info("Using default zero balance after RPC failure")
+				balance = "0"
+			} else {
+				configs.Logger.Info("Kay Retrieved current token balance",
+					zap.String("contractAddress", contractAddress.ID),
+					zap.String("holderAddress", holderAddress.ID),
+					zap.String("balance", balance))
+			}
+			// Create update document
+			update := bson.M{
+				"$set": bson.M{
+					"contractAddress": contractAddress.ID,
+					"holderAddress":   holderAddress.ID,
+					"balance":         balance,
+					"blockNumber":     blockNumber,
+					"updatedAt":       time.Now().UTC().Format(time.RFC3339),
+				},
+			}
+
+			// Update options
+			opts := options.Update().SetUpsert(true)
+
+			// Filter to find existing document
+			filter := bson.M{
+				"contractAddress": contractAddress.ID,
+				"holderAddress":   holderAddress.ID,
+			}
+
+			// Perform upsert
+			configs.Logger.Debug("Performing upsert operation for token balance")
+			result, err := collection.UpdateOne(context.Background(), filter, update, opts)
+			if err != nil {
+				configs.Logger.Error("Failed to update token balance in database",
+					zap.String("contractAddress", contractAddress.ID),
+					zap.String("holderAddress", holderAddress.ID),
+					zap.Error(err))
+				// return fmt.Errorf("failed to update token balance: %v", err)
+				return
+			}
+
+			configs.Logger.Info("Token balance update completed",
+				zap.String("contractAddress", contractAddress.ID),
+				zap.String("holderAddress", holderAddress.ID),
+				zap.Int64("matchedCount", result.MatchedCount),
+				zap.Int64("modifiedCount", result.ModifiedCount),
+				zap.Int64("upsertedCount", result.UpsertedCount))
+		}
+	}
+
+	// return nil
+}
+
+func GetTokenContracts(addressCollection *mongo.Collection) ([]models.Address, error) {
+
+	var contractAddresses []models.Address
+
+	filter := bson.M{"isContract": true}
+	cursor, err := addressCollection.Find(context.Background(), filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	err = cursor.All(context.Background(), &contractAddresses)
+	if err != nil {
+		return nil, err
+	}
+	return contractAddresses, nil
+}
+
+func GetTokenHolders(addressCollection *mongo.Collection) ([]models.Address, error) {
+
+	var contractAddresses []models.Address
+
+	filter := bson.M{"isContract": false}
+	cursor, err := addressCollection.Find(context.Background(), filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	err = cursor.All(context.Background(), &contractAddresses)
+	if err != nil {
+		return nil, err
+	}
+	return contractAddresses, nil
+}
+
+// End Kay

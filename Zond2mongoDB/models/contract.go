@@ -53,6 +53,7 @@ type ContractInfo struct {
 	MaxSupply       string `bson:"maxSupply,omitempty" json:"maxSupply,omitempty"`
 	MaxWalletAmount string `bson:"maxWalletAmount,omitempty" json:"maxWalletAmount,omitempty"`
 	MaxTxLimit      string `bson:"maxTxLimit,omitempty" json:"maxTxLimit,omitempty"`
+	ContractABI     string `bson:"contractABI" json:"contractABI,omitempty"`
 }
 
 // LogsResponse represents the response from zond_getLogs
