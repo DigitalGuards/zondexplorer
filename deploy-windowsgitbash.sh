@@ -200,7 +200,7 @@ setup_synchronizer() {
     cat > .env << EOL
 MONGOURI=mongodb://localhost:27017
 NODE_URL=$NODE_URL
-BEACONCHAIN_API=http://95.170.68.91:3500
+BEACONCHAIN_API=http://91.99.92.138:3500
 EOL
     # Build synchronizer with explicit output name
     print_status "Building synchronizer..."
