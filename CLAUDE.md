@@ -76,7 +76,8 @@ go build -o synchroniser main.go    # Build executable
 
 **Synchronizer (.env):**
 - `MONGOURI` - MongoDB connection string (without database name)
-- `NODE_URL` - Zond RPC endpoint
+- `NODE_URL` - Zond RPC endpoint for block sync
+- `MEMPOOL_NODE_URL` - (Optional) Separate RPC endpoint for mempool/pending tx detection. Falls back to NODE_URL if not set. Useful when using a public RPC for blocks but local node for mempool.
 - `BEACONCHAIN_API` - Beacon chain HTTP API endpoint
 
 ## MongoDB Collections (database: qrldata-z)
