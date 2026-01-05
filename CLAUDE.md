@@ -135,7 +135,7 @@ MAX_PENDING_AGE        = 24h   // Pending tx cleanup threshold
 
 ## Areas Needing Work
 
-1. **UI/UX Improvements**: Enhance the frontend design for a sleeker, more modern look and better user experience.
+1. **UI/UX Improvements**: Enhance the frontend design for a sleeker, more modern look and better user experience (e.g., improving chart visualizations, simplifying navigation, or ensuring responsive design on mobile devices).
 2. **Smart Contract Features**: Expand smart contract support - better contract interaction views, verified contract source display, and ABI decoding.
 3. **Validator Enhancements**: Improve validator-related features - detailed validator pages, staking analytics, and attestation tracking.
 
