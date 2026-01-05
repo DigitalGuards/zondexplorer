@@ -144,6 +144,20 @@ A local QRL Zond node is available for testing. Compare:
 - MongoDB logs - what the syncer has stored
 - Syncer logs - operational status of sync process
 
+## Git Workflow
+
+- **Branching Strategy**: Use feature branches for all new work. Create your branch from the `dev` branch.
+- **Never commit directly to `main` or `dev`** - all changes must go through Pull Requests (PRs).
+- **PR Process (for features/fixes)**:
+  1. Create a new branch from `dev` (e.g., `git checkout -b feat/new-feature dev`).
+  2. Commit and push changes to your feature branch.
+  3. Create a PR from your feature branch to `dev`.
+  4. Wait for Gemini's automated review (3-10 minutes depending on PR size) and address all comments.
+  5. Merge the PR into `dev` after it's approved.
+- **Release Process (dev to main)**:
+  1. Periodically, create a PR from `dev` to `main` to release new features.
+  2. This PR should also be reviewed before merging.
+
 ## Commit Convention
 
 Use conventional commits: `feat:`, `fix:`, `perf:`, `docs:`, `chore:`, `test:`
