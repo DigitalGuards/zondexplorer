@@ -144,6 +144,17 @@ A local QRL Zond node is available for testing. Compare:
 - MongoDB logs - what the syncer has stored
 - Syncer logs - operational status of sync process
 
+## Git Workflow
+
+- **Default branch**: Always work on the `dev` branch for new features and fixes
+- **Never commit directly to `main`** - all changes go through PRs
+- **PR process**:
+  1. Commit and push changes to `dev`
+  2. Create PR from `dev` to `main`
+  3. Wait for Gemini's automated review (3-10 minutes depending on PR size)
+  4. Address all review comments before merging
+  5. Only merge after review comments are resolved
+
 ## Commit Convention
 
 Use conventional commits: `feat:`, `fix:`, `perf:`, `docs:`, `chore:`, `test:`
