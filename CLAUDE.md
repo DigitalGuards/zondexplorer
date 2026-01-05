@@ -133,9 +133,11 @@ MAX_PENDING_AGE        = 24h   // Pending tx cleanup threshold
 
 1. **Pending Transaction Lifecycle (Fixed 2026-01-03)**: Fixed bug where mined transactions still showed as pending. The issue was in `backendAPI/routes/routes.go` - the `/pending-transaction/:hash` endpoint was returning mined transactions instead of returning 404. Also updated `ExplorerFrontend/app/tx/[query]/page.tsx` to check `status === 'pending'` before showing pending view.
 
-## Known Issues & Areas Needing Work
+## Areas Needing Work
 
-1. **Missing Blocks**: Some blocks that exist on the node may not be properly synced. Compare node data (via RPC) with MongoDB to identify gaps.
+1. **UI/UX Improvements**: Enhance the frontend design for a sleeker, more modern look and better user experience (e.g., improving chart visualizations, simplifying navigation, or ensuring responsive design on mobile devices).
+2. **Smart Contract Features**: Expand smart contract support - better contract interaction views, verified contract source display, and ABI decoding.
+3. **Validator Enhancements**: Improve validator-related features - detailed validator pages, staking analytics, and attestation tracking.
 
 ## Testing Against Local Node
 
