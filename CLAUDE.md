@@ -84,17 +84,26 @@ go build -o synchroniser main.go    # Build executable
 
 Core data:
 - `blocks` - Block headers and transactions
+- `transfer` - Individual transaction records
 - `transactionByAddress` - Indexed transactions by address
+- `internalTransactionByAddress` - Internal transactions (contract calls)
 - `addresses` - Wallet balances and metadata
 - `pending_transactions` - Mempool transactions (status: pending/mined)
 - `validators` - Single document containing all validators per epoch
-- `contractCode` - Smart contract deployments
+- `validatorHistory` - Historical validator counts per epoch
+- `contractCode` - Smart contract deployments and token metadata
+
+Token system:
+- `tokenTransfers` - ERC20 token transfer events (from Transfer event logs)
+- `tokenBalances` - Token holder balances per contract address
 
 Analytics:
 - `coingecko` - Market price data
 - `walletCount` - Total wallet metrics
 - `dailyTransactionsVolume` - Volume tracking
 - `totalCirculatingQuanta` - Supply tracking
+- `blockSize` - Block size history for charts
+- `syncState` - Tracks current sync progress (lastSyncedBlock)
 
 ## Code Organization
 
@@ -131,7 +140,11 @@ MAX_PENDING_AGE        = 24h   // Pending tx cleanup threshold
 
 ## Recent Fixes
 
-1. **Pending Transaction Lifecycle (Fixed 2026-01-03)**: Fixed bug where mined transactions still showed as pending. The issue was in `backendAPI/routes/routes.go` - the `/pending-transaction/:hash` endpoint was returning mined transactions instead of returning 404. Also updated `ExplorerFrontend/app/tx/[query]/page.tsx` to check `status === 'pending'` before showing pending view.
+1. **Token Transfer Display (Added 2026-01-07)**: Added token transfer information to transaction pages. The `/tx/:hash` endpoint now includes `tokenTransfer` data from the `tokenTransfers` collection. Frontend displays token name, amount, and addresses for ERC20 transfers. Pending transactions decode input data to show token transfer details before confirmation.
+
+2. **Pending Transaction Lifecycle (Fixed 2026-01-03)**: Fixed bug where mined transactions still showed as pending. The issue was in `backendAPI/routes/routes.go` - the `/pending-transaction/:hash` endpoint was returning mined transactions instead of returning 404. Also updated `ExplorerFrontend/app/tx/[query]/page.tsx` to check `status === 'pending'` before showing pending view.
+
+3. **Transaction Fee Calculation (Fixed)**: Fixed transaction fee calculation to properly store paid fees. Implemented fallback mechanisms when gas usage data is missing (receipt → gas limit → ensure non-zero for successful txs).
 
 ## Areas Needing Work
 
