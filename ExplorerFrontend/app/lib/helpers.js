@@ -27,12 +27,14 @@ export function toFixed(x) {
         let val = num * Math.pow(10, e-1);
         return '0.' + (new Array(e)).join('0') + val.toString().substring(2);
     }
-  } else {
-    var e = parseInt(num.toString().split('+')[1]);
-    if (e > 20) {
-        e -= 20;
-        let val = num / Math.pow(10, e);
-        return val + (new Array(e+1)).join('0');
+  } else if (num.toString().includes('e+')) {
+    // For large numbers that might be in scientific notation, use BigInt to format.
+    // This assumes the number is effectively an integer.
+    try {
+      return BigInt(num).toString();
+    } catch (error) {
+      // Fallback if not a clean integer, though this may still be in scientific notation
+      return num.toString();
     }
   }
   return num.toString();

@@ -47,3 +47,5 @@ backendAPI/backendAPI.log
 # Compiled binaries
 Zond2mongoDB/backendAPI
 backendAPI/syncer
+**/CLAUDE.md
+!/CLAUDE.md
