@@ -84,17 +84,26 @@ go build -o synchroniser main.go    # Build executable
 
 Core data:
 - `blocks` - Block headers and transactions
+- `transfer` - Individual transaction records
 - `transactionByAddress` - Indexed transactions by address
+- `internalTransactionByAddress` - Internal transactions (contract calls)
 - `addresses` - Wallet balances and metadata
 - `pending_transactions` - Mempool transactions (status: pending/mined)
 - `validators` - Single document containing all validators per epoch
-- `contractCode` - Smart contract deployments
+- `validatorHistory` - Historical validator counts per epoch
+- `contractCode` - Smart contract deployments and token metadata
+
+Token system:
+- `tokenTransfers` - ERC20 token transfer events (from Transfer event logs)
+- `tokenBalances` - Token holder balances per contract address
 
 Analytics:
 - `coingecko` - Market price data
 - `walletCount` - Total wallet metrics
 - `dailyTransactionsVolume` - Volume tracking
 - `totalCirculatingQuanta` - Supply tracking
+- `blockSize` - Block size history for charts
+- `syncState` - Tracks current sync progress (lastSyncedBlock)
 
 ## Code Organization
 
@@ -131,11 +140,17 @@ MAX_PENDING_AGE        = 24h   // Pending tx cleanup threshold
 
 ## Recent Fixes
 
-1. **Pending Transaction Lifecycle (Fixed 2026-01-03)**: Fixed bug where mined transactions still showed as pending. The issue was in `backendAPI/routes/routes.go` - the `/pending-transaction/:hash` endpoint was returning mined transactions instead of returning 404. Also updated `ExplorerFrontend/app/tx/[query]/page.tsx` to check `status === 'pending'` before showing pending view.
+1. **Token Transfer Display (Added 2026-01-07)**: Added token transfer information to transaction pages. The `/tx/:hash` endpoint now includes `tokenTransfer` data from the `tokenTransfers` collection. Frontend displays token name, amount, and addresses for ERC20 transfers. Pending transactions decode input data to show token transfer details before confirmation.
 
-## Known Issues & Areas Needing Work
+2. **Pending Transaction Lifecycle (Fixed 2026-01-03)**: Fixed bug where mined transactions still showed as pending. The issue was in `backendAPI/routes/routes.go` - the `/pending-transaction/:hash` endpoint was returning mined transactions instead of returning 404. Also updated `ExplorerFrontend/app/tx/[query]/page.tsx` to check `status === 'pending'` before showing pending view.
 
-1. **Missing Blocks**: Some blocks that exist on the node may not be properly synced. Compare node data (via RPC) with MongoDB to identify gaps.
+3. **Transaction Fee Calculation (Fixed)**: Fixed transaction fee calculation to properly store paid fees. Implemented fallback mechanisms when gas usage data is missing (receipt → gas limit → ensure non-zero for successful txs).
+
+## Areas Needing Work
+
+1. **UI/UX Improvements**: Enhance the frontend design for a sleeker, more modern look and better user experience (e.g., improving chart visualizations, simplifying navigation, or ensuring responsive design on mobile devices).
+2. **Smart Contract Features**: Expand smart contract support - better contract interaction views, verified contract source display, and ABI decoding.
+3. **Validator Enhancements**: Improve validator-related features - detailed validator pages, staking analytics, and attestation tracking.
 
 ## Testing Against Local Node
 
@@ -143,6 +158,20 @@ A local QRL Zond node is available for testing. Compare:
 - Node RPC (localhost:8545) - source of truth for blockchain data
 - MongoDB logs - what the syncer has stored
 - Syncer logs - operational status of sync process
+
+## Git Workflow
+
+- **Branching Strategy**: Use feature branches for all new work. Create your branch from the `dev` branch.
+- **Never commit directly to `main` or `dev`** - all changes must go through Pull Requests (PRs).
+- **PR Process (for features/fixes)**:
+  1. Create a new branch from `dev` (e.g., `git checkout -b feat/new-feature dev`).
+  2. Commit and push changes to your feature branch.
+  3. Create a PR from your feature branch to `dev`.
+  4. Wait for Gemini's automated review (3-10 minutes depending on PR size) and address all comments.
+  5. Merge the PR into `dev` after it's approved.
+- **Release Process (dev to main)**:
+  1. Periodically, create a PR from `dev` to `main` to release new features.
+  2. This PR should also be reviewed before merging.
 
 ## Commit Convention
 
