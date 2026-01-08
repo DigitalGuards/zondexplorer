@@ -62,6 +62,29 @@ go build -o synchroniser main.go    # Build executable
 ./update-frontend.sh                # Rebuild and restart frontend
 ```
 
+### Docker Compose
+```bash
+docker compose up -d                # Start all services (MongoDB, backend, frontend, syncer)
+docker compose ps                   # Check container status
+docker compose logs -f syncer       # Follow syncer logs
+docker compose down                 # Stop all services
+```
+
+Services run on: Frontend :3000, Backend :8082, MongoDB :27018
+
+### Kubernetes
+```bash
+./scripts/k8s-deploy.sh             # Deploy to Kubernetes cluster
+./scripts/k8s-deploy.sh --delete    # Remove deployment
+kubectl get pods -n zond-explorer   # Check pod status
+```
+
+Key K8s files:
+- `k8s/configmap.yaml` - Environment config (NODE_URL, BEACONCHAIN_API)
+- `k8s/secrets.yaml` - MongoDB credentials (base64 encoded)
+- `k8s/ingress.yaml` - External routing (update domain for production)
+- `k8s/mongodb/statefulset.yaml` - MongoDB with persistent storage
+
 ## Key Environment Variables
 
 **Frontend (.env):**
