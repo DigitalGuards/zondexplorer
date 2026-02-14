@@ -112,10 +112,10 @@ func syncMempool() error {
 		return nil
 	}
 
-	// Parse txpool_content response format (nested by address and nonce)
-	var txpoolResp models.TxPoolContentResponse
-	if err := json.Unmarshal([]byte(response), &txpoolResp); err != nil {
-		configs.Logger.Error("Failed to unmarshal txpool_content response",
+	// Parse zond_pendingTransactions response format (simple array)
+	var pendingResp models.PendingTransactionResponse
+	if err := json.Unmarshal([]byte(response), &pendingResp); err != nil {
+		configs.Logger.Error("Failed to unmarshal pending transactions response",
 			zap.Error(err),
 			zap.String("response", response[:min(len(response), 500)]))
 		return err
@@ -124,48 +124,22 @@ func syncMempool() error {
 	now := time.Now()
 	count := 0
 
-	// Process pending transactions from txpool_content format
-	// txpool_content returns: {"pending": {"address": {"nonce": tx}}, "queued": {...}}
-	for address, nonceTxs := range txpoolResp.Result.Pending {
-		for nonce, tx := range nonceTxs {
-			tx.Status = "pending"
-			tx.LastSeen = now
-			if tx.From == "" {
-				tx.From = address
-			}
-			if tx.Nonce == "" {
-				tx.Nonce = nonce
-			}
-			if err := db.UpsertPendingTransaction(&tx); err != nil {
-				configs.Logger.Error("Failed to upsert pending transaction",
-					zap.String("hash", tx.Hash),
-					zap.Error(err))
-			} else {
-				count++
-			}
+	// Process pending transactions from zond_pendingTransactions format
+	// zond_pendingTransactions returns: [array of transactions]
+	for _, tx := range pendingResp.Result {
+		tx.Status = "pending"
+		tx.LastSeen = now
+		if err := db.UpsertPendingTransaction(&tx); err != nil {
+			configs.Logger.Error("Failed to upsert pending transaction",
+				zap.String("hash", tx.Hash),
+				zap.Error(err))
+		} else {
+			count++
 		}
 	}
 
-	// Also process queued transactions
-	for address, nonceTxs := range txpoolResp.Result.Queued {
-		for nonce, tx := range nonceTxs {
-			tx.Status = "pending"
-			tx.LastSeen = now
-			if tx.From == "" {
-				tx.From = address
-			}
-			if tx.Nonce == "" {
-				tx.Nonce = nonce
-			}
-			if err := db.UpsertPendingTransaction(&tx); err != nil {
-				configs.Logger.Error("Failed to upsert pending transaction",
-					zap.String("hash", tx.Hash),
-					zap.Error(err))
-			} else {
-				count++
-			}
-		}
-	}
+	// Note: zond_pendingTransactions only returns pending transactions
+	// (no separate queued transactions like txpool_content)
 
 	if count > 0 {
 		configs.Logger.Info("Synced pending transactions",

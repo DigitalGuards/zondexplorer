@@ -25,11 +25,10 @@ func GetPendingTransactions() string {
 		return ""
 	}
 
-	// Use txpool_content which actually works on Zond nodes
-	// zond_pendingTransactions returns empty on most nodes
+	// Use zond_pendingTransactions for Zond nodes
 	rpcReq := models.JsonRPC{
 		Jsonrpc: "2.0",
-		Method:  "txpool_content",
+		Method:  "zond_pendingTransactions",
 		Params:  []interface{}{},
 		ID:      1,
 	}
