@@ -5,10 +5,11 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
-import { formatNumberWithCommas, timeAgo, formatStaked, formatGasPrice, truncateHash, formatAmount, formatAddress, NATIVE_UNIT } from './lib/helpers';
+import { formatNumberWithCommas, timeAgo, formatStaked, formatGasPrice, truncateHash, formatAddress, NATIVE_UNIT } from './lib/helpers';
 import type { EpochInfo } from './types';
 import config from '../config.js';
 import SearchBar from './components/SearchBar';
+import TransactionAmount from './components/TransactionAmount';
 
 const Charts = dynamic(() => import('./components/Charts'), {
   loading: () => (
@@ -336,7 +337,6 @@ function TransactionTable({ txs, loading }: { txs: TxResult[]; loading: boolean 
               const timestamp = parseTimestamp(tx.TimeStamp);
               const from = tx.From ? formatAddress(tx.From) : '';
               const to = tx.To ? formatAddress(tx.To) : '';
-              const [amount, unit] = formatAmount(tx.Amount);
 
               return (
                 <div key={`${tx.TxHash}-${idx}`} className={`${ROW_CLASS} hover:bg-surface transition-colors`}>
@@ -373,7 +373,7 @@ function TransactionTable({ txs, loading }: { txs: TxResult[]; loading: boolean 
 
                   <div className="flex-shrink-0">
                     <ValueBadge>
-                      {amount} <span className="text-text-muted ml-0.5">{unit}</span>
+                      <TransactionAmount amount={tx.Amount} />
                     </ValueBadge>
                   </div>
                 </div>
