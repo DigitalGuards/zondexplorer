@@ -95,7 +95,7 @@ export default function AddressView({ addressData, addressSegment }: AddressView
                 {addressType || 'Address'} {addressSegment}
             </h1>
             <Breadcrumbs items={[
-                { label: 'Address' },
+                { label: 'Address', translateLabel: true },
                 { label: `${addressSegment.slice(0, 10)}...${addressSegment.slice(-6)}` },
             ]} />
             <section

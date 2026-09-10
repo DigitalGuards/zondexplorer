@@ -12,6 +12,7 @@ import {
 import config from '../../config';
 import FundFlowPanel from './fund-flow';
 import { palette } from '../lib/theme';
+import TimeDisplay from '../components/TimeDisplay';
 import {
   buildHistoricalPlays,
   buildGroupedLadder,
@@ -209,16 +210,6 @@ function formatSignedPercent(fraction: string): string {
   return `${value > 0 ? '+' : ''}${value.toFixed(2)}%`;
 }
 
-function formatTimestamp(value: number | string): string {
-  const date = typeof value === 'number' ? new Date(value) : new Date(value);
-  if (Number.isNaN(date.getTime())) return '...';
-  return date.toLocaleTimeString('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZone: 'UTC',
-  });
-}
 
 function StatCard({
   label,
@@ -652,9 +643,9 @@ function DepthLadder({
   // right edge. It must not be an extra spanning <td>: that adds column slots
   // the <thead> does not have, and table-fixed then lays the table out with
   // more columns than there are headers, so every header drifts left of the
-  // values it labels. The `1a` suffix is the palette color at 10% alpha.
+  // values it labels. Each bar uses its semantic color at 10% opacity.
   const depthBarStyle = (side: MarketSide, width: string): string => {
-    const color = side === 'buy' ? `${palette.success}1a` : `${palette.error}1a`;
+    const color = `color-mix(in srgb, ${side === 'buy' ? palette.success : palette.error} 10%, transparent)`;
     return `linear-gradient(to left, ${color} ${width}, transparent ${width})`;
   };
 
@@ -758,7 +749,7 @@ function RecentTrades({ trades }: { trades: MarketTrade[] }): JSX.Element {
         <table className="w-full min-w-[330px] font-mono text-xs" aria-label="Recent QRL USDT trades">
           <thead>
             <tr className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
-              <th className="py-1.5 text-left font-medium">UTC</th>
+              <th className="py-1.5 text-left font-medium">Time</th>
               <th className="py-1.5 text-left font-medium">Side</th>
               <th className="py-1.5 text-right font-medium">Price</th>
               <th className="py-1.5 text-right font-medium">QRL</th>
@@ -767,7 +758,7 @@ function RecentTrades({ trades }: { trades: MarketTrade[] }): JSX.Element {
           <tbody>
             {ordered.map((trade) => (
               <tr key={marketTradeKey(trade)} className="border-t border-border/50">
-                <td className="py-1.5 text-text-muted">{formatTimestamp(trade.time)}</td>
+                <td className="py-1.5 text-text-muted"><TimeDisplay timestamp={trade.time / 1000} clockOnly /></td>
                 <td className={`py-1.5 uppercase ${trade.aggressorSide === 'buy' ? 'text-success' : 'text-error'}`}>
                   {trade.aggressorSide}
                 </td>
@@ -816,7 +807,7 @@ function PlayFeed({ plays }: { plays: MarketPlay[] }): JSX.Element {
                 <div className="flex items-baseline justify-between gap-3">
                   <p className={`text-sm font-medium ${tone}`}>{outcome}</p>
                   <time className="font-mono text-[11px] text-text-muted" dateTime={new Date(play.occurredAt).toISOString()}>
-                    {formatTimestamp(play.occurredAt)}
+                    <TimeDisplay timestamp={play.occurredAt / 1000} clockOnly />
                   </time>
                 </div>
                 <p className="mt-0.5 text-xs text-text-secondary">
@@ -961,8 +952,8 @@ export default function OrderBookClient(): JSX.Element {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-text-muted">
-          <span>Book {formatTimestamp(data.fetchedAt)} UTC</span>
-          <span>Last print {newestTrade ? `${formatTimestamp(newestTrade.time)} UTC` : 'waiting'}</span>
+          <span>Book <TimeDisplay timestamp={new Date(data.fetchedAt).getTime() / 1000} clockOnly /></span>
+          <span>Last print {newestTrade ? <TimeDisplay timestamp={newestTrade.time / 1000} clockOnly /> : 'waiting'}</span>
           <a
             href="https://www.mexc.com/exchange/QRL_USDT"
             target="_blank"
