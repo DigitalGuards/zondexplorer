@@ -1,5 +1,10 @@
 'use client';
 
+import AddressText from '../../components/AddressText';
+import TimeDisplay from '../../components/TimeDisplay';
+import { usePreferences } from '../../components/PreferencesProvider';
+import { isZeroTokenTransfer } from '../../lib/preferences';
+
 import { useState, useEffect, useCallback } from 'react';
 import ImageWithFallback from '../../components/ImageWithFallback';
 import Link from 'next/link';
@@ -114,7 +119,7 @@ interface TokenContractViewProps {
 const AddressDisplay = ({ address, truncate = false }: { address: string; truncate?: boolean }) => {
     if (!address) return <span className="text-text-muted">Unknown</span>;
 
-    const display = truncate ? `${address.slice(0, 10)}...${address.slice(-8)}` : address;
+    const display = truncate ? <AddressText address={address} leading={10} trailing={8} /> : address;
     return (
         <Link href={`/address/${address}`} className={`text-accent hover:text-accent-hover font-mono text-xs md:text-sm${truncate ? '' : ' break-all'}`}>
             {display}
@@ -158,19 +163,9 @@ const formatTokenAmount = (amount: string, decimals: number): string => {
 // prevents the anchor from becoming an XSS vector.
 const isHttpUrl = (u?: string): boolean => !!u && /^https?:\/\//i.test(u);
 
-const formatTimestamp = (timestamp: string): string => {
-    if (!timestamp) return 'Unknown';
-
-    let ts = timestamp;
-    if (timestamp.startsWith('0x')) {
-        ts = parseInt(timestamp, 16).toString();
-    }
-
-    const date = new Date(parseInt(ts) * 1000);
-    return date.toUTCString();
-};
 
 export default function TokenContractView({ address, contractData, handlerUrl }: TokenContractViewProps) {
+    const { preferences, updatePreferences } = usePreferences();
     const tokenStandard = contractData.tokenStandard;
     const isNFT = tokenStandard === 'ERC-721' || tokenStandard === 'ERC-1155';
     // URL-backed tab + per-tab pages + tokenID filter so the browser Back
@@ -185,6 +180,8 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
     const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
     const [holders, setHolders] = useState<TokenHolder[]>([]);
     const [transfers, setTransfers] = useState<TokenTransfer[]>([]);
+    const visibleTransfers = transfers.filter(transfer => !preferences.hideZeroTokenTransfers || !isZeroTokenTransfer({ ...transfer, tokenStandard }));
+    const hiddenTransfers = transfers.length - visibleTransfers.length;
     const [holdersTotal, setHoldersTotal] = useState(0);
     const [transfersTotal, setTransfersTotal] = useState(0);
     const [holdersPageParam, setHoldersPageParam] = useUrlIntParam('hp', 1);
@@ -394,7 +391,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
     return (
         <div className="detail-content">
             <Breadcrumbs items={[
-                { label: 'Contracts', href: '/contracts' },
+                { label: 'Contracts', translateLabel: true, href: '/contracts' },
                 { label: tabLabel, href: tabHref },
                 { label: `${symbol || address.slice(0, 10) + '...' + address.slice(-6)}` },
             ]} />
@@ -410,7 +407,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                 the layout doesn't shift while the next/image
                                 loader resolves. */}
                             {metaImage ? (
-                                <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden border border-border bg-black/30">
+                                <div className="relative w-12 h-12 md:w-16 md:h-16 rounded-full overflow-hidden border border-border bg-background-tertiary">
                                     <ImageWithFallback
                                         src={metaImage}
                                         alt={name}
@@ -472,7 +469,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                         per-id (Phase 2 will surface per-id supply on the holders
                         endpoint). */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-black/20 rounded-lg p-3 md:p-4">
+                        <div className="bg-background-tertiary rounded-lg p-3 md:p-4">
                             <div className="text-xs md:text-sm text-text-secondary mb-1">
                                 {tokenStandard === 'ERC-721' ? 'Total Items' : 'Total Supply'}
                             </div>
@@ -485,19 +482,19 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                     : `${formatTokenAmount(totalSupply, decimals)}${rawSymbol ? ' ' + rawSymbol : ''}`}
                             </div>
                         </div>
-                        <div className="bg-black/20 rounded-lg p-3 md:p-4">
+                        <div className="bg-background-tertiary rounded-lg p-3 md:p-4">
                             <div className="text-xs md:text-sm text-text-secondary mb-1">Holders</div>
                             <div className="text-sm md:text-base font-semibold text-text-primary">
                                 {tokenInfo?.holderCount?.toLocaleString() ?? '-'}
                             </div>
                         </div>
-                        <div className="bg-black/20 rounded-lg p-3 md:p-4">
+                        <div className="bg-background-tertiary rounded-lg p-3 md:p-4">
                             <div className="text-xs md:text-sm text-text-secondary mb-1">Transfers</div>
                             <div className="text-sm md:text-base font-semibold text-text-primary">
                                 {tokenInfo?.transferCount?.toLocaleString() ?? '-'}
                             </div>
                         </div>
-                        <div className="bg-black/20 rounded-lg p-3 md:p-4">
+                        <div className="bg-background-tertiary rounded-lg p-3 md:p-4">
                             <div className="text-xs md:text-sm text-text-secondary mb-1">
                                 {isNFT ? 'Standard' : 'Decimals'}
                             </div>
@@ -585,7 +582,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                         {/* Creation Transaction Details */}
                         <div>
                             <h3 className="font-display text-lg font-semibold text-text-primary mb-4">Creation Transaction</h3>
-                            <div className="bg-black/20 rounded-lg p-4 space-y-3">
+                            <div className="bg-background-tertiary rounded-lg p-4 space-y-3">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                                     <div className="text-xs md:text-sm text-text-secondary">Transaction Hash</div>
                                     <div className="flex items-center gap-2 min-w-0">
@@ -638,7 +635,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                         <div className="text-xs md:text-sm text-text-secondary">Timestamp</div>
                                         <div className="text-sm text-text-secondary">
                                             {creationTx?.BlockTimestamp
-                                                ? formatTimestamp(creationTx.BlockTimestamp)
+                                                ? <TimeDisplay timestamp={creationTx.BlockTimestamp} />
                                                 : '-'}
                                         </div>
                                     </div>
@@ -695,7 +692,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                             debounces locally and only sets the actual filter on submit,
                             so each keystroke doesn't trigger a network request. */}
                         {isNFT && (
-                            <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-black/20">
+                            <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-background-tertiary">
                                 <label htmlFor="tokenIDFilter" className="text-xs text-text-secondary">
                                     Filter by tokenID:
                                 </label>
@@ -713,7 +710,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                             setUrlParams({ tokenId: holderTokenIDInput.trim() || null, hp: null }, 'replace');
                                         }
                                     }}
-                                    className="px-2 py-1 rounded bg-black/40 border border-border text-sm text-text-primary font-mono w-32"
+                                    className="px-2 py-1 rounded bg-background-tertiary border border-border text-sm text-text-primary font-mono w-32"
                                 />
                                 <button
                                     onClick={() => {
@@ -750,7 +747,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                             <>
                                 <div className="overflow-x-auto">
                                     <table aria-label="Token holders" className="w-full">
-                                        <thead className="bg-black/30">
+                                        <thead className="bg-background-tertiary">
                                             <tr>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">#</th>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Address</th>
@@ -793,7 +790,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                                     : `${formatTokenAmount(holder.balance, decimals)}${rawSymbol ? ' ' + rawSymbol : ''}`;
 
                                                 return (
-                                                    <tr key={rowKey} className="hover:bg-white/5">
+                                                    <tr key={rowKey} className="hover:bg-surface-2">
                                                         <td className="px-4 py-3 text-sm text-text-secondary">
                                                             {holdersPage * limit + idx + 1}
                                                         </td>
@@ -869,7 +866,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                             <>
                                 <div className="overflow-x-auto">
                                     <table aria-label="Token IDs" className="w-full">
-                                        <thead className="bg-black/30">
+                                        <thead className="bg-background-tertiary">
                                             <tr>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase w-16"></th>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Token</th>
@@ -888,7 +885,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                                 return (
                                                     <tr
                                                         key={t.tokenID}
-                                                        className="hover:bg-white/5 cursor-pointer"
+                                                        className="hover:bg-surface-2 cursor-pointer"
                                                         onClick={() => {
                                                             // Tab + filter + page in ONE URL write so Back
                                                             // undoes the jump atomically; the filter input
@@ -898,7 +895,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                                     >
                                                         <td className="px-4 py-3">
                                                             {t.image ? (
-                                                                <div className="relative w-10 h-10 rounded-md overflow-hidden border border-border bg-black/30">
+                                                                <div className="relative w-10 h-10 rounded-md overflow-hidden border border-border bg-background-tertiary">
                                                                     <ImageWithFallback
                                                                         src={t.image}
                                                                         alt={tokenLabel}
@@ -970,6 +967,10 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                 {/* Transfers Tab */}
                 {activeTab === 'transfers' && (
                     <div>
+                        {hiddenTransfers > 0 && <p className="p-4 text-sm text-text-muted">
+                            {hiddenTransfers} zero-quantity transfers hidden on this page.{' '}
+                            <button type="button" className="text-accent hover:underline" onClick={() => updatePreferences({ hideZeroTokenTransfers: false })}>Show zero transfers</button>
+                        </p>}
                         {loading ? (
                             <div className="p-8 text-center text-text-secondary">Loading transfers...</div>
                         ) : transfers.length === 0 ? (
@@ -978,7 +979,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                             <>
                                 <div className="overflow-x-auto">
                                     <table aria-label="Token transfers" className="w-full">
-                                        <thead className="bg-black/30">
+                                        <thead className="bg-background-tertiary">
                                             <tr>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Tx Hash</th>
                                                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">From</th>
@@ -988,8 +989,9 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border">
-                                            {transfers.map((transfer) => (
-                                                <tr key={`${transfer.txHash}-${transfer.from}-${transfer.to}`} className="hover:bg-white/5">
+                                            {visibleTransfers.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-text-muted">All transfers on this page are hidden by your preferences.</td></tr>}
+                                            {visibleTransfers.map((transfer) => (
+                                                <tr key={`${transfer.txHash}-${transfer.from}-${transfer.to}`} className="hover:bg-surface-2">
                                                     <td className="px-4 py-3">
                                                         <Link
                                                             href={`/tx/${transfer.txHash}`}
@@ -1008,7 +1010,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                                         {formatTokenAmount(transfer.amount, transfer.tokenDecimals || decimals)}{rawSymbol ? ' ' + rawSymbol : ''}
                                                     </td>
                                                     <td className="px-4 py-3 text-right text-xs text-text-secondary hidden md:table-cell">
-                                                        {formatTimestamp(transfer.timestamp)}
+                                                        <TimeDisplay timestamp={transfer.timestamp} />
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1020,7 +1022,7 @@ export default function TokenContractView({ address, contractData, handlerUrl }:
                                 {transfersTotal > limit && (
                                     <div className="flex items-center justify-between px-4 py-3 border-t border-border">
                                         <div className="text-sm text-text-secondary">
-                                            Showing {transfersPage * limit + 1} - {Math.min((transfersPage + 1) * limit, transfersTotal)} of {transfersTotal}
+                                            Records {transfersPage * limit + 1} - {Math.min((transfersPage + 1) * limit, transfersTotal)} of {transfersTotal}
                                         </div>
                                         <div className="flex gap-2">
                                             <button

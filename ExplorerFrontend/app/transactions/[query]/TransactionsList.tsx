@@ -1,11 +1,15 @@
 'use client';
+import InterfaceText from '../../components/InterfaceText';
+
+import TimeDisplay from '../../components/TimeDisplay';
+import AddressText from '../../components/AddressText';
 
 import { useMemo } from 'react';
 import axios from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { timeAgo, truncateHash } from '../../lib/helpers';
+import { truncateHash } from '../../lib/helpers';
 import TransactionAmount from '../../components/TransactionAmount';
 import SearchBar from '../../components/SearchBar';
 import Pagination from '../../components/Pagination';
@@ -53,7 +57,7 @@ export default function TransactionsList({
 
   return (
     <div className="py-4 sm:py-6 lg:py-8">
-      <h1 className="section-title mb-4">Transactions</h1>
+      <h1 className="section-title mb-4"><InterfaceText text="Transactions" /></h1>
 
       <div className="mb-6">
         <SearchBar />
@@ -73,13 +77,13 @@ export default function TransactionsList({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider">Hash</th>
+                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider"><InterfaceText text="Hash" /></th>
                     <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden sm:[display:table-cell]">Type</th>
-                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden xl:[display:table-cell]">From</th>
-                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden xl:[display:table-cell]">To</th>
-                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden md:[display:table-cell]">Block</th>
-                    <th className="text-right px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider">Amount</th>
-                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider">Time</th>
+                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden xl:[display:table-cell]"><InterfaceText text="From" /></th>
+                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden xl:[display:table-cell]"><InterfaceText text="To" /></th>
+                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider hidden md:[display:table-cell]"><InterfaceText text="Block" /></th>
+                    <th className="text-right px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider"><InterfaceText text="Amount" /></th>
+                    <th className="text-left px-2 2xl:px-4 py-3 text-[11px] font-normal text-text-muted uppercase tracking-wider"><InterfaceText text="Time" /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -136,7 +140,7 @@ export default function TransactionsList({
                               className="text-text-secondary hover:text-accent font-mono text-xs transition-colors"
                               title={fromAddr}
                             >
-                              {truncateHash(fromAddr, 8, 6)}
+                              <AddressText address={fromAddr} />
                             </Link>
                           ) : (
                             <span className="text-text-muted text-xs">-</span>
@@ -149,7 +153,7 @@ export default function TransactionsList({
                               className="text-text-secondary hover:text-accent font-mono text-xs transition-colors"
                               title={toAddr}
                             >
-                              {truncateHash(toAddr, 8, 6)}
+                              <AddressText address={toAddr} />
                             </Link>
                           ) : (
                             <span className="text-text-muted text-xs">-</span>
@@ -171,7 +175,7 @@ export default function TransactionsList({
                           <TransactionAmount amount={tx.Amount} />
                         </td>
                         <td className="px-2 2xl:px-4 py-3 text-text-secondary tabular-nums whitespace-nowrap">
-                          {timeAgo(tx.TimeStamp)}
+                          <TimeDisplay timestamp={tx.TimeStamp} relative />
                         </td>
                       </tr>
                     );
