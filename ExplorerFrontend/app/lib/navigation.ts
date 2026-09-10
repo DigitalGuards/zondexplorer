@@ -115,5 +115,6 @@ export function isNavigationActive(pathname: string, href: string): boolean {
 
 export const EXPLORER_NETWORKS = [
   { id: 'testnet-v2', name: 'QRL Testnet v2', status: 'active' },
+  { id: 'testnet-v3', name: 'QRL Testnet v3', status: 'planned' },
   { id: 'mainnet', name: 'QRL Mainnet', status: 'planned' },
 ] as const;
