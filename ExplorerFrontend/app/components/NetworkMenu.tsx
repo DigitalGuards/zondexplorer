@@ -35,12 +35,12 @@ export default function NetworkMenu() {
             className="menu-option disabled:cursor-default disabled:text-text-muted"
             aria-current={network.status === 'active' ? 'true' : undefined}
           >
-            <span className="flex-1 text-left">{network.name}</span>
+            <span className="flex-1 text-left">{t(network.name)}</span>
             {network.status === 'active' ? (
               <CheckIcon className="size-4 text-accent" aria-hidden="true" />
             ) : (
               <span className="text-[10px] rounded border border-border px-1.5 py-0.5">
-                {t('Coming later')}
+                {t(network.id === 'testnet-v3' ? 'Upcoming' : 'Coming later')}
               </span>
             )}
           </MenuItem>
