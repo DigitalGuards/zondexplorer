@@ -14,8 +14,11 @@ type sandboxLauncher struct {
 	PolicySHA256 string
 }
 
-func newSandboxLauncher(_, _ string) (*sandboxLauncher, error) {
-	return nil, errors.New("sealed NsJail compiler sandbox requires Linux")
+func newSandboxLauncher(_, _, execMode string) (*sandboxLauncher, error) {
+	if _, err := parseSandboxExecMode(execMode); err != nil {
+		return nil, err
+	}
+	return nil, errors.New("NsJail compiler sandbox requires Linux")
 }
 
 func (s *sandboxLauncher) run(
@@ -26,7 +29,7 @@ func (s *sandboxLauncher) run(
 	_ int,
 	_ int,
 ) ([]byte, []byte, error) {
-	return nil, nil, errors.New("sealed NsJail compiler sandbox requires Linux")
+	return nil, nil, errors.New("NsJail compiler sandbox requires Linux")
 }
 
 func (s *sandboxLauncher) Close() error { return nil }

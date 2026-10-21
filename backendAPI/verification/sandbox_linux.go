@@ -29,9 +29,23 @@ type sandboxLauncher struct {
 	mu         sync.RWMutex
 	execFile   *os.File
 	policyFile *os.File
+	execPath   string
+	pathOps    sandboxPathOps
 }
 
-func newSandboxLauncher(path, expectedSHA256 string) (*sandboxLauncher, error) {
+func newSandboxLauncher(path, expectedSHA256, execMode string) (*sandboxLauncher, error) {
+	return newSandboxLauncherWithPathOps(path, expectedSHA256, execMode, sandboxPathOps{
+		lstat: os.Lstat,
+		open:  openReadOnlyNoFollow,
+		stat:  (*os.File).Stat,
+	})
+}
+
+func newSandboxLauncherWithPathOps(path, expectedSHA256, execMode string, pathOps sandboxPathOps) (*sandboxLauncher, error) {
+	mode, err := parseSandboxExecMode(execMode)
+	if err != nil {
+		return nil, err
+	}
 	if path == "" {
 		return nil, errors.New("VERIFIER_SANDBOX_BIN is required")
 	}
@@ -50,13 +64,26 @@ func newSandboxLauncher(path, expectedSHA256 string) (*sandboxLauncher, error) {
 		return nil, err
 	}
 
-	execFile, err := snapshotSandboxLauncher(path, digest)
-	if err != nil {
-		return nil, err
+	var execFile *os.File
+	var execPath string
+	if mode == sandboxExecModePath {
+		verified, err := pathOps.verify(path, digest)
+		if err != nil {
+			return nil, err
+		}
+		if err := verified.Close(); err != nil {
+			return nil, fmt.Errorf("close verified NsJail sandbox launcher: %w", err)
+		}
+		execPath = path
+	} else {
+		execFile, err = snapshotSandboxLauncher(path, digest)
+		if err != nil {
+			return nil, err
+		}
 	}
 	keepExec := false
 	defer func() {
-		if !keepExec {
+		if !keepExec && execFile != nil {
 			_ = execFile.Close()
 		}
 	}()
@@ -77,6 +104,8 @@ func newSandboxLauncher(path, expectedSHA256 string) (*sandboxLauncher, error) {
 		PolicySHA256: policyDigest,
 		execFile:     execFile,
 		policyFile:   policyFile,
+		execPath:     execPath,
+		pathOps:      pathOps,
 	}
 
 	keepExec = true
@@ -145,7 +174,7 @@ func (s *sandboxLauncher) run(
 ) ([]byte, []byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.execFile == nil || s.policyFile == nil {
+	if (s.execFile == nil && s.execPath == "") || s.policyFile == nil {
 		return nil, nil, errors.New("sandbox launcher is closed")
 	}
 	if compilerFile == nil {
@@ -159,9 +188,12 @@ func (s *sandboxLauncher) run(
 		compilerSnapshotArg,
 	}
 	commandArgs = append(commandArgs, args...)
-	cmd := exec.CommandContext(runCtx, sandboxSnapshotExecArg, commandArgs...)
+	execPath := sandboxSnapshotExecArg
+	if s.execPath != "" {
+		execPath = s.execPath
+	}
+	cmd := exec.CommandContext(runCtx, execPath, commandArgs...)
 	configureCompilerProcess(cmd)
-	cmd.ExtraFiles = []*os.File{s.execFile, compilerFile, s.policyFile}
 	cmd.Env = []string{}
 	if stdin != nil {
 		cmd.Stdin = stdin
@@ -170,6 +202,17 @@ func (s *sandboxLauncher) run(
 	stderr := newBoundedBuffer(maxStderr, cancel)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	execFile := s.execFile
+	if s.execPath != "" {
+		var err error
+		execFile, err = s.pathOps.verify(s.execPath, s.SHA256)
+		if err != nil {
+			return nil, nil, fmt.Errorf("re-verify NsJail sandbox launcher before launch: %w", err)
+		}
+		defer execFile.Close()
+	}
+	// Keep the compiler and policy at their existing child descriptor numbers.
+	cmd.ExtraFiles = []*os.File{execFile, compilerFile, s.policyFile}
 	err := cmd.Run()
 	if stdout.Overflowed() {
 		return stdout.Bytes(), stderr.Bytes(), ErrCompilerOutputTooLarge

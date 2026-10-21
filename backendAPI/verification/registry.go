@@ -56,6 +56,7 @@ type Registry struct {
 // process-wide compile budget) regardless of which build a request selects.
 // VERIFIER_SANDBOX_BIN and VERIFIER_SANDBOX_SHA256 identify the mandatory,
 // fully static NsJail launcher shared by every enabled build.
+// VERIFIER_SANDBOX_EXEC_MODE selects sealed (default) or root-owned path execution.
 //
 // A non-default build whose sealed artifact cannot be invoked, reports the
 // wrong version, or fails its binary hash check is skipped with a warning. The
@@ -95,6 +96,7 @@ func NewRegistry() (*Registry, error) {
 	sandbox, err := newSandboxLauncher(
 		strings.TrimSpace(os.Getenv("VERIFIER_SANDBOX_BIN")),
 		strings.TrimSpace(os.Getenv("VERIFIER_SANDBOX_SHA256")),
+		os.Getenv("VERIFIER_SANDBOX_EXEC_MODE"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("verification sandbox unavailable: %w", err)
