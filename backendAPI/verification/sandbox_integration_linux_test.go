@@ -28,7 +28,7 @@ func realSandboxForIntegrationTest(t *testing.T) *sandboxLauncher {
 	if path == "" || digest == "" {
 		t.Fatalf("%s=1 requires VERIFIER_SANDBOX_BIN and VERIFIER_SANDBOX_SHA256", realSandboxTestEnv)
 	}
-	sandbox, err := newSandboxLauncher(path, digest)
+	sandbox, err := newSandboxLauncher(path, digest, os.Getenv("VERIFIER_SANDBOX_EXEC_MODE"))
 	if err != nil {
 		t.Fatalf("load real NsJail sandbox: %v", err)
 	}
@@ -170,6 +170,23 @@ func TestRealSandboxIsolationAndMandatoryLimits(t *testing.T) {
 	compiler := compilerWithRealSandbox(t, sandbox, path, digest, buildID)
 	if _, err := compiler.Compile(context.Background(), StandardJSONInput{Language: "Hyperion"}); err != nil {
 		t.Fatalf("sandbox isolation probe failed: %v", err)
+	}
+}
+
+func TestRealSandboxPathMode(t *testing.T) {
+	if os.Getenv(realSandboxTestEnv) != "1" || os.Getenv("VERIFIER_SANDBOX_EXEC_MODE") != sandboxExecModePath {
+		t.Skip("set VERIFIER_REAL_SANDBOX_TEST=1 and VERIFIER_SANDBOX_EXEC_MODE=path with a root-owned NsJail installation")
+	}
+	sandbox := realSandboxForIntegrationTest(t)
+	if sandbox.execPath == "" || sandbox.execFile != nil {
+		t.Fatal("real sandbox did not select path execution")
+	}
+	path, digest, buildID := writeSandboxProbeCompiler(t, "isolation", "")
+	compiler := compilerWithRealSandbox(t, sandbox, path, digest, buildID)
+	for i := 0; i < 2; i++ {
+		if _, err := compiler.Compile(context.Background(), StandardJSONInput{Language: "Hyperion"}); err != nil {
+			t.Fatalf("path sandbox isolation probe %d failed: %v", i, err)
+		}
 	}
 }
 

@@ -7,16 +7,18 @@ x86-64 Hyperion compiler, and a fully static x86-64 NsJail launcher.
 
 ## Sealed execution trust chain
 
-Registry initialization fails closed unless both executable artifacts have
-absolute paths and exact SHA-256 pins. For each artifact, the backend:
+The default `VERIFIER_SANDBOX_EXEC_MODE=sealed` retains the sealed execution
+trust chain. Registry initialization fails closed unless both executable
+artifacts have absolute paths and exact SHA-256 pins. For each artifact, the
+backend:
 
 1. Rejects symlinks, FIFO, device, socket, non-regular, non-executable, and
    group-writable or world-writable paths. Linux opens use `openat2` with
    `RESOLVE_NO_SYMLINKS`, `RESOLVE_NO_MAGICLINKS`, `O_NONBLOCK`, and a
    descriptor identity check.
 2. Requires a Linux x86-64 ELF with no `PT_INTERP` program header and no
-   `DT_NEEDED` dependency. Host loaders and shared-library trees are outside
-   the execution identity and are therefore unsupported.
+   `DT_NEEDED` dependency. Dynamic ELF executables are unsupported. NsJail's
+   glibc NSS runtime requirements are described in the deployment section below.
 3. Copies the exact open descriptor into an executable `memfd`, calculates its
    SHA-256 during that copy, requires the configured digest, and seals the
    snapshot against writes, growth, shrinking, execute-mode changes, and
@@ -30,12 +32,12 @@ it. The current policy digest is:
 cc2c6d14e943c9b4b9252e69c2fbf9a5a4313938cd561594a255746393baaa8c
 ```
 
-Each compiler version probe and compile launches the sealed NsJail snapshot as
-child fd 3. NsJail reads the sealed policy from child fd 5 and executes the
-sealed Hyperion snapshot by fd from child fd 4. No trusted host pathname is
-resolved after registry initialization. Replacing the configured NsJail,
-Hyperion, or manifest pathname cannot change a running registry's retained
-bytes.
+In sealed mode, each compiler version probe and compile launches the sealed
+NsJail snapshot as child fd 3. NsJail reads the sealed policy from child fd 5
+and executes the sealed Hyperion snapshot by fd from child fd 4. The executable
+and manifest source paths are used only at registry initialization. Replacing
+the configured NsJail, Hyperion, or manifest pathname cannot change a running
+registry's retained bytes.
 
 Registry shutdown closes all retained descriptors. Initialization fails closed
 outside Linux and when the kernel does not support race-free `openat2`,
@@ -88,12 +90,15 @@ an inner ceiling when the Go wall timeout is configured higher.
 Set these global values in addition to the compiler registry:
 
 ```bash
+VERIFIER_SANDBOX_EXEC_MODE=sealed
 VERIFIER_SANDBOX_BIN=/absolute/path/to/nsjail-static
 VERIFIER_SANDBOX_SHA256=<exact-64-character-sha256>
 ```
 
-Both settings are mandatory. The digest should come from the exact deployment
-artifact, not from a tag name or source commit alone.
+The binary path and digest are mandatory. The digest must identify the exact
+deployment artifact bytes. The execution mode defaults to `sealed` when unset
+or empty. Its only accepted nonempty values are `sealed` and `path`; other
+values fail registry initialization with a configuration error.
 
 [`build-nsjail-static.sh`](./build-nsjail-static.sh) builds from an already
 initialized, clean checkout and refuses source commits other than NsJail 3.6 at
@@ -116,6 +121,76 @@ sha256sum /absolute/output/nsjail-static
 Set `NSJAIL_EXPECTED_SHA256` when reproducing an artifact whose exact binary
 digest is already approved. The recipe never embeds a workstation-specific
 binary digest.
+
+## Ubuntu 23.10+ and AppArmor path execution
+
+Ubuntu 23.10+ supports restricting unprivileged user namespaces through
+AppArmor. When `kernel.apparmor_restrict_unprivileged_userns=1`, the NsJail
+executable needs an attached profile granting `userns`. See the
+[Ubuntu namespace restriction documentation](https://documentation.ubuntu.com/release-notes/23.10/).
+Profiles attach by executable path. Executing the sealed memfd bypasses the
+installed pathname's profile, and namespace setup can fail with
+`mount('/', MS_REC|MS_PRIVATE): Permission denied`.
+
+Set `VERIFIER_SANDBOX_EXEC_MODE=path` on these hosts. This executes the absolute
+`VERIFIER_SANDBOX_BIN` pathname after verifying all of the following at registry
+initialization and again immediately before every version probe and compile:
+
+- Every path component is free of symlinks, including components before `..`.
+- The binary is a regular executable owned by uid 0, with no group or other
+  write permission.
+- Every parent directory through `/` is owned by uid 0, with no group or other
+  write permission. Sticky world-writable directories such as `/tmp` fail.
+- The binary matches `VERIFIER_SANDBOX_SHA256` and passes the same static Linux
+  x86-64 ELF checks as sealed mode.
+
+The checks use a no-follow `openat2` descriptor, bound the hash read, and check
+file identity and metadata around verification. Any failure prevents launch.
+Path mode relies on root administrators preserving the protected path between
+the final check and execution. Stop the verifier before replacing NsJail,
+update its digest, and restart it after the installation is complete.
+
+Build NsJail against the deployment host's glibc. Despite having no `PT_INTERP`
+or `DT_NEEDED`, the static build still loads the host's NSS libraries at runtime
+for its user lookup. A build against glibc 2.39 crashed with SIGFPE on a glibc
+2.43 host. Build on the host or in a matching build environment, and repeat the
+real-sandbox smoke test after a host glibc upgrade.
+
+Install the reviewed artifact at the fixed profile path. Use root ownership
+and mode `0755` for the installation directory and binary. Verify that `/`,
+`/usr`, `/usr/local`, and `/usr/local/lib` also satisfy the parent checks:
+
+```bash
+sudo install -d -o root -g root -m 0755 /usr/local/lib/zondscan-verifier
+sudo install -o root -g root -m 0755 ./nsjail-static /usr/local/lib/zondscan-verifier/nsjail-static
+namei -l /usr/local/lib/zondscan-verifier/nsjail-static
+sha256sum /usr/local/lib/zondscan-verifier/nsjail-static
+```
+
+Create the profile as a root-owned `0644` file and load it with
+[`apparmor_parser`](https://manpages.ubuntu.com/manpages/noble/man8/apparmor_parser.8.html):
+
+```bash
+sudo install -o root -g root -m 0644 /dev/stdin /etc/apparmor.d/zondscan-nsjail <<'EOF'
+profile zondscan-nsjail /usr/local/lib/zondscan-verifier/nsjail-static flags=(unconfined) {
+  userns,
+}
+EOF
+sudo apparmor_parser -r /etc/apparmor.d/zondscan-nsjail
+```
+
+Configure the backend with the installed artifact's exact digest:
+
+```bash
+VERIFIER_SANDBOX_EXEC_MODE=path
+VERIFIER_SANDBOX_BIN=/usr/local/lib/zondscan-verifier/nsjail-static
+VERIFIER_SANDBOX_SHA256=<exact-64-character-sha256>
+```
+
+The backend continues to run as an unprivileged service user. The compiler and
+embedded policy remain sealed and are passed at child fds 4 and 5 with the
+existing arguments, environment, namespaces, seccomp policy, and limits. The
+verified NsJail descriptor occupies fd 3 while NsJail executes by pathname.
 
 ## Configuring compiler builds
 
@@ -199,7 +274,7 @@ Schema `qrl.contract-compiler-provenance.v2` binds the build id and these exact,
 ordered components:
 
 1. `hypc`: the sealed compiler artifact SHA-256
-2. `nsjail`: the sealed launcher artifact SHA-256
+2. `nsjail`: the verified launcher artifact SHA-256
 3. `policy`: the exact embedded NsJail config SHA-256
 
 The execution digest uses unsigned 64-bit big-endian length prefixes for every
@@ -238,6 +313,12 @@ VERIFIER_TEST_HYPC_SHA256=<hypc-sha256> \
 VERIFIER_TEST_HYPC_BUILD_ID='<exact-Version-field>' \
 go test -count=1 -v ./verification -run 'TestReal(Sandbox|Static)'
 ```
+
+For path mode, add `VERIFIER_SANDBOX_EXEC_MODE=path` and use
+`VERIFIER_SANDBOX_BIN=/usr/local/lib/zondscan-verifier/nsjail-static` after the
+root-owned installation and profile setup above. The same guarded suite then
+runs through the installed pathname, including `TestRealSandboxPathMode`.
+The default suite continues to exercise sealed execution.
 
 The probes validate the empty root and environment, hostname, mandatory
 rlimits, host read and write denial, TCP and Unix socket denial, process
