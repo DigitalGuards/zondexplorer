@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
 func fakeSandboxForTest(t *testing.T) *sandboxLauncher {
 	t.Helper()
 	path, digest := writeFakeSandboxLauncher(t)
-	sandbox, err := newSandboxLauncher(path, digest)
+	sandbox, err := newSandboxLauncher(path, digest, "")
 	if err != nil {
 		t.Fatalf("new fake sandbox launcher: %v", err)
 	}
@@ -237,6 +237,7 @@ func setFakeSandboxEnv(t *testing.T) {
 	path, digest := writeFakeSandboxLauncher(t)
 	t.Setenv("VERIFIER_SANDBOX_BIN", path)
 	t.Setenv("VERIFIER_SANDBOX_SHA256", digest)
+	t.Setenv("VERIFIER_SANDBOX_EXEC_MODE", sandboxExecModeSealed)
 }
 
 func withoutPTInterp(t *testing.T, path string) string {

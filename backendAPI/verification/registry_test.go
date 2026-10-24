@@ -33,6 +33,7 @@ func clearVerifierEnv(t *testing.T) {
 		"VERIFIER_COMPILER_MAX_STDERR_BYTES",
 		"VERIFIER_SANDBOX_BIN",
 		"VERIFIER_SANDBOX_SHA256",
+		"VERIFIER_SANDBOX_EXEC_MODE",
 	} {
 		t.Setenv(key, "")
 	}

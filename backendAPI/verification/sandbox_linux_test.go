@@ -42,7 +42,7 @@ func writeStaticExitLauncher(t *testing.T, exitCode int) (string, string) {
 
 func TestSandboxLauncherSealsPolicyAndSurvivesSourceReplacement(t *testing.T) {
 	launcherPath, launcherDigest := writeFakeSandboxLauncher(t)
-	sandbox, err := newSandboxLauncher(launcherPath, launcherDigest)
+	sandbox, err := newSandboxLauncher(launcherPath, launcherDigest, "")
 	if err != nil {
 		t.Fatalf("newSandboxLauncher: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestSandboxLauncherRejectsUnpinnedOrDynamicArtifacts(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sandbox, err := newSandboxLauncher(tc.path, tc.digest)
+			sandbox, err := newSandboxLauncher(tc.path, tc.digest, "")
 			if sandbox != nil {
 				_ = sandbox.Close()
 			}
@@ -190,5 +190,43 @@ func TestSandboxPolicyDigestUsesExactEmbeddedBytes(t *testing.T) {
 	digest := sha256.Sum256(sandboxPolicy)
 	if got := hex.EncodeToString(digest[:]); got != sandboxPolicyExpectedSHA256 {
 		t.Fatalf("embedded policy digest = %q, want %q", got, sandboxPolicyExpectedSHA256)
+	}
+}
+
+func TestRegistrySandboxExecModes(t *testing.T) {
+	path, digest := writeFakeNativeCompiler(t, "sandbox-mode")
+	for _, mode := range []string{"", "sealed", "path", "invalid"} {
+		t.Run(mode, func(t *testing.T) {
+			clearVerifierEnv(t)
+			setFakeSandboxEnv(t)
+			t.Setenv("HYPC_BUILD_ID", "sandbox-mode")
+			t.Setenv("HYPC_BIN", path)
+			t.Setenv("HYPC_SHA256", digest)
+			t.Setenv("VERIFIER_SANDBOX_EXEC_MODE", mode)
+			reg, err := NewRegistry()
+			if reg != nil {
+				t.Cleanup(func() { _ = reg.Close() })
+			}
+			switch mode {
+			case "", "sealed":
+				if err != nil {
+					t.Fatalf("NewRegistry: %v", err)
+				}
+				if reg.sandbox.execPath != "" || reg.sandbox.execFile == nil {
+					t.Fatal("registry did not select sealed execution")
+				}
+			case "path":
+				// The fixture is under a writable temporary directory. Path
+				// mode must fail even though the default build is usable.
+				if err == nil || !strings.Contains(err.Error(), "verification sandbox unavailable") ||
+					(!strings.Contains(err.Error(), "owned by uid 0") && !strings.Contains(err.Error(), "group or world writable")) {
+					t.Fatalf("NewRegistry path mode error = %v, want protected path rejection", err)
+				}
+			case "invalid":
+				if err == nil || !strings.Contains(err.Error(), "VERIFIER_SANDBOX_EXEC_MODE must be sealed or path") {
+					t.Fatalf("NewRegistry error = %v, want invalid mode rejection", err)
+				}
+			}
+		})
 	}
 }
